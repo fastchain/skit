@@ -24,7 +24,7 @@ c2s_protocol_options:
   - "no_sslv3"
   - "no_tlsv1"
   - "no_tlsv1_1"
-c2s_dhfile: /opt/ejabberd/conf/certs/dhparams.pem
+#c2s_dhfile: /opt/ejabberd/conf/certs/dhparams.pem
 
 s2s_use_starttls: required
 s2s_ciphers: "HIGH:!aNULL:!eNULL:!3DES:!RC4:!MD5:!PSK:!SRP:!CAMELLIA"
@@ -32,7 +32,7 @@ s2s_protocol_options:
   - "no_sslv3"
   - "no_tlsv1"
   - "no_tlsv1_1"
-s2s_dhfile: /opt/ejabberd/conf/certs/dhparams.pem
+#s2s_dhfile: /opt/ejabberd/conf/certs/dhparams.pem
 
 ## =====================================================
 ## Listeners
