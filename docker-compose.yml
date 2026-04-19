@@ -8,7 +8,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-ejabberd}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ejabberd}
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - ./postgres-data:/var/lib/postgresql/data
       # Schema is loaded only on the very first startup of the DB volume.
       # Generate it with ./fetch-schema.sh before the first `docker compose up`.
       - ./sql/pg.new.sql:/docker-entrypoint-initdb.d/10-ejabberd.sql:ro
@@ -44,8 +44,8 @@ services:
     ports:
       - "80:80"
     volumes:
-      - certbot-etc:/etc/letsencrypt
-      - certbot-lib:/var/lib/letsencrypt
+      - ./certbot-etc:/etc/letsencrypt
+      - ./certbot-lib:/var/lib/letsencrypt
       - ./certs:/certs
     environment:
       - ACME_EMAIL=${ACME_EMAIL:-admin@db.dfsf.org}
@@ -118,9 +118,9 @@ services:
     volumes:
       - ./conf/ejabberd.yml:/opt/ejabberd/conf/ejabberd.yml:ro
       - ./certs:/opt/ejabberd/conf/certs:ro
-      - ejabberd-database:/opt/ejabberd/database
-      - ejabberd-logs:/opt/ejabberd/logs
-      - ejabberd-upload:/opt/ejabberd/upload
+      - ./ejabberd-database:/opt/ejabberd/database
+      - ./ejabberd-logs:/opt/ejabberd/logs
+      - ./ejabberd-upload:/opt/ejabberd/upload
     environment:
       - ERLANG_NODE=ejabberd@localhost
       - EJABBERD_MACROS_FILE=/opt/ejabberd/conf/ejabberd.yml

@@ -65,13 +65,13 @@ listen:
     module: ejabberd_http
     tls: true
     request_handlers:
-      /admin: ejabberd_web_admin
-      /api: mod_http_api
-      /bosh: mod_bosh
-      /captcha: ejabberd_captcha
+#      /admin: ejabberd_web_admin
+#      /api: mod_http_api
+#      /bosh: mod_bosh
+#      /captcha: ejabberd_captcha
       /upload: mod_http_upload
       /ws: ejabberd_http_ws
-      /oauth: ejabberd_oauth
+#      /oauth: ejabberd_oauth
   ## STUN/TURN is handled by the dedicated eturnal container (see docker-compose.yml).
 
 ## =====================================================

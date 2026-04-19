@@ -14,3 +14,10 @@ sql/*
 
 # Local development overrides
 docker-compose.override.yml
+
+ejabberd-database/*
+ejabberd-logs/*
+ejabberd-upload/*
+postgres-data/*
+certbot-etc/*
+certbot-lib/*
