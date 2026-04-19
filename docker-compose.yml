@@ -56,11 +56,15 @@ services:
         DOMAIN=db.dfsf.org
         LIVE=/etc/letsencrypt/live/$$DOMAIN
 
-        # Build the single-PEM bundle that ejabberd expects (fullchain + key).
+        # Write all cert files consumed by ejabberd and eturnal.
+        # ejabberd needs a combined PEM (fullchain + key in one file).
+        # eturnal (TLS-TURN) needs the files separate.
         bundle() {
           cat "$$LIVE/fullchain.pem" "$$LIVE/privkey.pem" > "/certs/$$DOMAIN.pem"
-          chmod 640 "/certs/$$DOMAIN.pem"
-          echo "certbot: bundle written to /certs/$$DOMAIN.pem"
+          cp  "$$LIVE/fullchain.pem" "/certs/fullchain.pem"
+          cp  "$$LIVE/privkey.pem"   "/certs/privkey.pem"
+          chmod 640 "/certs/$$DOMAIN.pem" "/certs/fullchain.pem" "/certs/privkey.pem"
+          echo "certbot: cert files written to /certs/"
         }
 
         echo "certbot: requesting certificate for $$DOMAIN (email: $$ACME_EMAIL)"
@@ -82,7 +86,15 @@ services:
           certbot renew \
             --standalone \
             --quiet \
-            --post-hook "cat $$LIVE/fullchain.pem $$LIVE/privkey.pem > /certs/$$DOMAIN.pem && chmod 640 /certs/$$DOMAIN.pem && echo certbot: renewed bundle written"
+            --post-hook "
+              cat /etc/letsencrypt/live/db.dfsf.org/fullchain.pem \
+                  /etc/letsencrypt/live/db.dfsf.org/privkey.pem \
+                  > /certs/db.dfsf.org.pem
+              cp /etc/letsencrypt/live/db.dfsf.org/fullchain.pem /certs/fullchain.pem
+              cp /etc/letsencrypt/live/db.dfsf.org/privkey.pem   /certs/privkey.pem
+              chmod 640 /certs/db.dfsf.org.pem /certs/fullchain.pem /certs/privkey.pem
+              echo certbot: renewed cert files written
+            "
         done
 
   ejabberd:
@@ -100,10 +112,9 @@ services:
       - "5223:5223"
       # XMPP server-to-server
       - "5269:5269"
-      # STUN/TURN
-      - "3478:3478/udp"
       # HTTPS (BOSH, WebSocket, admin, file upload)
       - "5443:5443"
+      # Note: STUN/TURN (3478, 5349) is handled by the eturnal service.
     volumes:
       - ./conf/ejabberd.yml:/opt/ejabberd/conf/ejabberd.yml:ro
       - ./certs:/opt/ejabberd/conf/certs:ro
@@ -123,6 +134,31 @@ services:
       nofile:
         soft: 65536
         hard: 65536
+
+  # ---------------------------------------------------------------------------
+  # eturnal — dedicated STUN/TURN server for WebRTC ICE.
+  #
+  # Uses network_mode: host so that the relay port range (49152–65535 UDP) and
+  # the main STUN/TURN ports (3478 UDP+TCP, 5349 TLS) are directly on the host
+  # without needing thousands of Docker port mappings.
+  #
+  # Firewall requirements (open inbound on the host):
+  #   UDP  3478        — STUN/TURN plain
+  #   TCP  3478        — STUN/TURN plain (fallback)
+  #   TCP  5349        — TURN over TLS
+  #   UDP  49152-65535 — TURN relay traffic
+  #
+  # The shared secret and relay IP are configured in conf/eturnal.yml.
+  # TLS cert files are written by the certbot service into ./certs/.
+  # ---------------------------------------------------------------------------
+  eturnal:
+    image: ghcr.io/processone/eturnal:latest
+    container_name: eturnal
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./conf/eturnal.yml:/etc/eturnal/eturnal.yml:ro
+      - ./certs:/etc/eturnal/tls:ro
 
 volumes:
   ejabberd-database:
