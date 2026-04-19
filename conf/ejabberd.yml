@@ -1,0 +1,251 @@
+### ejabberd production configuration
+### Replace "xmpp.example.com" with your actual domain.
+
+hosts:
+  - 192.168.2.12
+
+loglevel: info
+
+## =====================================================
+## TLS / Certificates
+## =====================================================
+## Place a full-chain PEM (cert + intermediates + privkey)
+## in ./certs/xmpp.example.com.pem
+certfiles:
+  - /opt/ejabberd/conf/certs/192.168.2.12.pem
+
+## Enforce strong TLS on c2s
+c2s_ciphers: "HIGH:!aNULL:!eNULL:!3DES:!RC4:!MD5:!PSK:!SRP:!CAMELLIA"
+c2s_protocol_options:
+  - "no_sslv3"
+  - "no_tlsv1"
+  - "no_tlsv1_1"
+c2s_dhfile: /opt/ejabberd/conf/certs/dhparams.pem
+
+s2s_use_starttls: required
+s2s_ciphers: "HIGH:!aNULL:!eNULL:!3DES:!RC4:!MD5:!PSK:!SRP:!CAMELLIA"
+s2s_protocol_options:
+  - "no_sslv3"
+  - "no_tlsv1"
+  - "no_tlsv1_1"
+s2s_dhfile: /opt/ejabberd/conf/certs/dhparams.pem
+
+## =====================================================
+## Listeners
+## =====================================================
+listen:
+  -
+    port: 5222
+    ip: "::"
+    module: ejabberd_c2s
+    max_stanza_size: 262144
+    shaper: c2s_shaper
+    access: c2s
+    starttls_required: true
+  -
+    port: 5223
+    ip: "::"
+    module: ejabberd_c2s
+    tls: true
+    max_stanza_size: 262144
+    shaper: c2s_shaper
+    access: c2s
+  -
+    port: 5269
+    ip: "::"
+    module: ejabberd_s2s_in
+    max_stanza_size: 524288
+  -
+    port: 5443
+    ip: "::"
+    module: ejabberd_http
+    tls: true
+    request_handlers:
+      /admin: ejabberd_web_admin
+      /api: mod_http_api
+      /bosh: mod_bosh
+      /captcha: ejabberd_captcha
+      /upload: mod_http_upload
+      /ws: ejabberd_http_ws
+      /oauth: ejabberd_oauth
+  -
+    port: 3478
+    ip: "::"
+    transport: udp
+    module: ejabberd_stun
+    use_turn: true
+    ## Set your public IP here
+    turn_ipv4_address: "192.168.2.12"
+
+## =====================================================
+## Database (PostgreSQL)
+## =====================================================
+default_db: sql
+new_sql_schema: true
+sql_type: pgsql
+sql_server: postgres
+sql_port: 5432
+sql_database: ejabberd
+sql_username: ejabberd
+sql_password: ejabberd
+sql_pool_size: 10
+
+## =====================================================
+## Authentication
+## =====================================================
+auth_method: sql
+auth_password_format: scram
+
+## Registration locked down in production: admins create users.
+registration_timeout: infinity
+
+## =====================================================
+## Access rules
+## =====================================================
+acl:
+  admin:
+    user:
+      - "admin@xmpp.example.com"
+  local:
+    user_regexp: ""
+  loopback:
+    ip:
+      - 127.0.0.0/8
+      - ::1/128
+  trusted_network:
+    ip:
+      - 127.0.0.0/8
+      - ::1/128
+
+access_rules:
+  local:
+    allow: local
+  c2s:
+    deny: blocked
+    allow: all
+  announce:
+    allow: admin
+  configure:
+    allow: admin
+  muc_create:
+    allow: local
+  pubsub_createnode:
+    allow: local
+  register:
+    deny: all
+  trusted_network:
+    allow: loopback
+
+api_permissions:
+  "console commands":
+    from:
+      - ejabberd_ctl
+    who: all
+    what: "*"
+  "admin access":
+    who:
+      access:
+        allow:
+          acl: loopback
+          acl: admin
+      oauth:
+        scope: "ejabberd:admin"
+        access:
+          allow:
+            acl: loopback
+            acl: admin
+    what:
+      - "*"
+      - "!stop"
+      - "!start"
+
+shaper:
+  normal:
+    rate: 3000
+    burst_size: 20000
+  fast: 100000
+
+shaper_rules:
+  max_user_sessions: 10
+  max_user_offline_messages:
+    5000: admin
+    100: all
+  c2s_shaper:
+    none: admin
+    normal: all
+  s2s_shaper: fast
+
+## =====================================================
+## Modules
+## =====================================================
+modules:
+  mod_adhoc: {}
+  mod_admin_extra: {}
+  mod_announce:
+    access: announce
+  mod_register:
+    access: register
+    ip_access: trusted_network
+  mod_avatar: {}
+  mod_blocking: {}
+  mod_bosh: {}
+  mod_caps: {}
+  mod_carboncopy: {}
+  mod_client_state: {}
+  mod_configure: {}
+  mod_disco: {}
+  mod_fail2ban: {}
+  mod_http_api: {}
+  mod_http_upload:
+    put_url: https://@HOST@:5443/upload
+    max_size: 104857600  # 100 MiB
+    thumbnail: false
+    custom_headers:
+      "Access-Control-Allow-Origin": "*"
+      "Access-Control-Allow-Methods": "GET,HEAD,PUT,OPTIONS"
+      "Access-Control-Allow-Headers": "Content-Type"
+  mod_last: {}
+  mod_mam:
+    db_type: sql
+    assume_mam_usage: true
+    default: always
+  mod_mqtt: {}
+  mod_muc:
+    access:
+      - allow
+    access_admin:
+      - allow: admin
+    access_create: muc_create
+    access_persistent: muc_create
+    access_mam:
+      - allow
+    default_room_options:
+      mam: true
+      persistent: true
+  mod_muc_admin: {}
+  mod_offline:
+    access_max_user_messages: max_user_offline_messages
+  mod_ping: {}
+  mod_privacy: {}
+  mod_private: {}
+  mod_pubsub:
+    access_createnode: pubsub_createnode
+    plugins:
+      - flat
+      - pep
+    force_node_config:
+      storage:bookmarks:
+        access_model: whitelist
+  mod_push: {}
+  mod_push_keepalive: {}
+  mod_roster:
+    versioning: true
+  mod_s2s_dialback: {}
+  mod_shared_roster: {}
+  mod_stream_mgmt:
+    resend_on_timeout: if_offline
+  mod_stun_disco: {}
+  mod_vcard: {}
+  mod_vcard_xupdate: {}
+  mod_version:
+    show_os: false

@@ -1,0 +1,65 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ejabberd-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ejabberd}
+      POSTGRES_USER: ${POSTGRES_USER:-ejabberd}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ejabberd}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Schema is loaded only on the very first startup of the DB volume.
+      # Generate it with ./fetch-schema.sh before the first `docker compose up`.
+      - ./sql/pg.new.sql:/docker-entrypoint-initdb.d/10-ejabberd.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ejabberd} -d ${POSTGRES_DB:-ejabberd}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  ejabberd:
+    image: ghcr.io/processone/ejabberd:latest
+    container_name: ejabberd
+    restart: unless-stopped
+    hostname: xmpp.example.com
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      # XMPP client-to-server (STARTTLS)
+      - "5222:5222"
+      # XMPP client-to-server (Direct TLS)
+      - "5223:5223"
+      # XMPP server-to-server
+      - "5269:5269"
+      # STUN/TURN
+      - "3478:3478/udp"
+      # HTTPS (BOSH, WebSocket, admin, file upload)
+      - "5443:5443"
+    volumes:
+      - ./conf/ejabberd.yml:/opt/ejabberd/conf/ejabberd.yml:ro
+      - ./certs:/opt/ejabberd/conf/certs:ro
+      - ejabberd-database:/opt/ejabberd/database
+      - ejabberd-logs:/opt/ejabberd/logs
+      - ejabberd-upload:/opt/ejabberd/upload
+    environment:
+      - ERLANG_NODE=ejabberd@localhost
+      - EJABBERD_MACROS_FILE=/opt/ejabberd/conf/ejabberd.yml
+    healthcheck:
+      test: ["CMD", "ejabberdctl", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+
+volumes:
+  ejabberd-database:
+  ejabberd-logs:
+  ejabberd-upload:
+  postgres-data:
