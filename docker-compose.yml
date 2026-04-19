@@ -19,11 +19,77 @@ services:
       retries: 5
       start_period: 10s
 
+  # ---------------------------------------------------------------------------
+  # certbot — obtains and auto-renews a Let's Encrypt TLS certificate for
+  # db.dfsf.org using the HTTP-01 standalone challenge (port 80).
+  #
+  # First-run order: start certbot before ejabberd so the cert bundle exists
+  # when ejabberd reads it:
+  #   docker compose up -d certbot
+  #   # wait ~30 s for the certificate to be issued, then:
+  #   docker compose up -d
+  #
+  # After renewal ejabberd must pick up the new cert. Reload it online with:
+  #   docker exec ejabberd ejabberdctl reload_config
+  # or simply: docker compose restart ejabberd
+  #
+  # Requirements:
+  #   - Port 80 must be reachable from the internet (for the ACME challenge).
+  #   - ACME_EMAIL must be set in .env (or it defaults to admin@db.dfsf.org).
+  # ---------------------------------------------------------------------------
+  certbot:
+    image: certbot/certbot:latest
+    container_name: certbot
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - certbot-etc:/etc/letsencrypt
+      - certbot-lib:/var/lib/letsencrypt
+      - ./certs:/certs
+    environment:
+      - ACME_EMAIL=${ACME_EMAIL:-admin@db.dfsf.org}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        DOMAIN=db.dfsf.org
+        LIVE=/etc/letsencrypt/live/$$DOMAIN
+
+        # Build the single-PEM bundle that ejabberd expects (fullchain + key).
+        bundle() {
+          cat "$$LIVE/fullchain.pem" "$$LIVE/privkey.pem" > "/certs/$$DOMAIN.pem"
+          chmod 640 "/certs/$$DOMAIN.pem"
+          echo "certbot: bundle written to /certs/$$DOMAIN.pem"
+        }
+
+        echo "certbot: requesting certificate for $$DOMAIN (email: $$ACME_EMAIL)"
+        certbot certonly \
+          --standalone \
+          --non-interactive \
+          --agree-tos \
+          --email "$$ACME_EMAIL" \
+          -d "$$DOMAIN" \
+          --keep-until-expiring
+
+        [ -d "$$LIVE" ] && bundle
+
+        # Check for renewal every 12 hours; Let's Encrypt renews when
+        # fewer than 30 days remain on the certificate.
+        trap exit TERM INT
+        while :; do
+          sleep 12h & wait $$!
+          certbot renew \
+            --standalone \
+            --quiet \
+            --post-hook "cat $$LIVE/fullchain.pem $$LIVE/privkey.pem > /certs/$$DOMAIN.pem && chmod 640 /certs/$$DOMAIN.pem && echo certbot: renewed bundle written"
+        done
+
   ejabberd:
     image: ghcr.io/processone/ejabberd:latest
     container_name: ejabberd
     restart: unless-stopped
-    hostname: xmpp.example.com
+    hostname: db.dfsf.org
     depends_on:
       postgres:
         condition: service_healthy
@@ -63,3 +129,5 @@ volumes:
   ejabberd-logs:
   ejabberd-upload:
   postgres-data:
+  certbot-etc:
+  certbot-lib:

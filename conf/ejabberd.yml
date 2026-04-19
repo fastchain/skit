@@ -2,7 +2,7 @@
 ### Replace "xmpp.example.com" with your actual domain.
 
 hosts:
-  - 192.168.2.12
+  - db.dfsf.org
 
 loglevel: info
 
@@ -11,8 +11,12 @@ loglevel: info
 ## =====================================================
 ## Place a full-chain PEM (cert + intermediates + privkey)
 ## in ./certs/xmpp.example.com.pem
+## Certificate bundle produced by certbot (fullchain + privkey, see docker-compose.yml).
+## Run `docker compose up -d certbot` once before starting ejabberd so this
+## file exists.  After automatic renewal reload with:
+##   docker exec ejabberd ejabberdctl reload_config
 certfiles:
-  - /opt/ejabberd/conf/certs/192.168.2.12.pem
+  - /opt/ejabberd/conf/certs/db.dfsf.org.pem
 
 ## Enforce strong TLS on c2s
 c2s_ciphers: "HIGH:!aNULL:!eNULL:!3DES:!RC4:!MD5:!PSK:!SRP:!CAMELLIA"
@@ -75,7 +79,8 @@ listen:
     module: ejabberd_stun
     use_turn: true
     ## Set your public IP here
-    turn_ipv4_address: "192.168.2.12"
+    ## Set your server's public IPv4 address here.
+    turn_ipv4_address: "0.0.0.0"
 
 ## =====================================================
 ## Database (PostgreSQL)
@@ -105,7 +110,7 @@ registration_timeout: infinity
 acl:
   admin:
     user:
-      - "admin@xmpp.example.com"
+      - "admin@db.dfsf.org"
   local:
     user_regexp: ""
   loopback:
