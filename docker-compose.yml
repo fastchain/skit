@@ -160,10 +160,10 @@ services:
       - ./conf/eturnal.yml:/etc/eturnal/eturnal.yml:ro
       - ./certs:/etc/eturnal/tls:ro
 
-volumes:
-  ejabberd-database:
-  ejabberd-logs:
-  ejabberd-upload:
-  postgres-data:
-  certbot-etc:
-  certbot-lib:
+#volumes:
+#  ejabberd-database:
+#  ejabberd-logs:
+#  ejabberd-upload:
+#  postgres-data:
+#  certbot-etc:
+#  certbot-lib:
