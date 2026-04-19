@@ -260,8 +260,8 @@ modules:
         transport: tcp
       - host: "65.109.236.51"
         port: 5349
-        type: turn
-        transport: tls
+        type: turns
+        transport: tcp
   mod_vcard: {}
   mod_vcard_xupdate: {}
   mod_version:
