@@ -1,0 +1,16 @@
+# ejabberd docker-compose project
+
+# Environment files with sensitive configuration
+.env
+
+# IDE
+.idea/
+
+# Generated certificates
+certs/*
+
+# Generated SQL schemas
+sql/*
+
+# Local development overrides
+docker-compose.override.yml
